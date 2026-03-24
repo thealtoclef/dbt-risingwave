@@ -11,6 +11,8 @@
   {%- set grant_config = config.get('grants') -%}
 
   {% if full_refresh_mode and old_relation %}
+    {{ risingwave__drop_embedded_sink_if_exists(target_relation) }}
+    {{ risingwave__drop_subscription_if_exists(target_relation) }}
     {{ adapter.drop_relation(old_relation) }}
   {% endif %}
 
@@ -18,6 +20,10 @@
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
 
   {{ risingwave__ensure_schema_authorization(target_relation) }}
+
+  {% if old_relation is none %}
+    {{ risingwave__embedded_precheck(target_relation) }}
+  {% endif %}
 
   {% if old_relation is none or (full_refresh_mode and old_relation) %}
     {% call statement('main') -%}
@@ -33,6 +39,9 @@
 
   {% set should_revoke = should_revoke(existing_relation=old_relation, full_refresh_mode=full_refresh_mode) %}
   {% do apply_grants(target_relation, grant_config, should_revoke=should_revoke) %}
+
+  {{ risingwave__manage_subscription(target_relation, full_refresh_mode) }}
+  {{ risingwave__manage_embedded_sink(target_relation, full_refresh_mode) }}
 
   {% do persist_docs(target_relation, model) %}
 
