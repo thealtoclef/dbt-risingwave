@@ -247,6 +247,22 @@
     ;
 {%- endmacro %}
 
+{% macro risingwave__get_primary_keys(relation) %}
+  {% if execute %}
+    {% set q %}
+      select name from rw_catalog.rw_columns
+      where relation_id = (
+        select id from rw_catalog.rw_tables
+        where name = '{{ relation.identifier }}'
+        and schema_id = (select id from rw_catalog.rw_schemas where name = '{{ relation.schema }}')
+      ) and is_primary_key = true
+    {% endset %}
+    {% set results = run_query(q) %}
+    {% do return(results.columns[0].values() | join(',')) %}
+  {% endif %}
+  {% do return('') %}
+{% endmacro %}
+
 {% macro risingwave__run_sql(sql) -%}
   {% set contract_config = config.get('contract') %}
   {% if contract_config.enforced %}

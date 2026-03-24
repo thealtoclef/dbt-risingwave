@@ -10,11 +10,17 @@
                                                 type='table') -%}
 
   {% if full_refresh_mode and old_relation %}
+    {{ risingwave__drop_embedded_sink_if_exists(target_relation) }}
+    {{ risingwave__drop_subscription_if_exists(target_relation) }}
     {{ adapter.drop_relation(old_relation) }}
   {% endif %}
 
   {{ run_hooks(pre_hooks, inside_transaction=False) }}
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
+
+  {% if old_relation is none %}
+    {{ risingwave__embedded_precheck(target_relation) }}
+  {% endif %}
 
   {% if old_relation is none or (full_refresh_mode and old_relation) %}
     {% call statement('main') -%}
@@ -25,6 +31,9 @@
   {% else %}
     {{ risingwave__handle_on_configuration_change(old_relation, target_relation) }}
   {% endif %}
+
+  {{ risingwave__manage_subscription(target_relation, full_refresh_mode) }}
+  {{ risingwave__manage_embedded_sink(target_relation, full_refresh_mode) }}
 
   {% do persist_docs(target_relation, model) %}
 

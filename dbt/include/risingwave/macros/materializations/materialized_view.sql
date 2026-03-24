@@ -17,6 +17,8 @@
   {%- set immediate_cleanup = zero_downtime_config.get('immediate_cleanup', false) -%}
 
   {% if full_refresh_mode and old_relation %}
+    {{ risingwave__drop_embedded_sink_if_exists(target_relation) }}
+    {{ risingwave__drop_subscription_if_exists(target_relation) }}
     {{ adapter.drop_relation(old_relation) }}
   {% endif %}
 
@@ -24,6 +26,7 @@
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
 
   {% if old_relation is none %}
+    {{ risingwave__embedded_precheck(target_relation) }}
     {# First time creation #}
     {% call statement('main') -%}
       {{ risingwave__create_materialized_view_as(target_relation, sql) }}
@@ -62,12 +65,16 @@
       {%- endcall %}
       {{ risingwave__wait_for_background_ddl(temp_relation, 'materialized_view') }}
 
-      {# Step 2: Swap the materialized views #}
+      {# Step 2: Drop sink and subscription before swap (they reference the old MV) #}
+      {{ risingwave__drop_embedded_sink_if_exists(target_relation) }}
+      {{ risingwave__drop_subscription_if_exists(target_relation) }}
+
+      {# Step 3: Swap the materialized views #}
       {% call statement('swap') -%}
         {{ risingwave__swap_materialized_views(old_relation, temp_relation) }}
       {%- endcall %}
 
-      {# Step 3: Conditionally drop the old materialized view (now with temp name) #}
+      {# Step 4: Conditionally drop the old materialized view (now with temp name) #}
       {% if immediate_cleanup %}
         {{- log("Immediately cleaning up temporary materialized view: " ~ temp_relation) -}}
         {{ risingwave__drop_relation(temp_relation) }}
@@ -86,6 +93,9 @@
       {{ risingwave__handle_on_configuration_change(old_relation, target_relation) }}
     {% endif %}
   {% endif %}
+
+  {{ risingwave__manage_subscription(target_relation, full_refresh_mode) }}
+  {{ risingwave__manage_embedded_sink(target_relation, full_refresh_mode) }}
 
   {% do persist_docs(target_relation, model) %}
 
