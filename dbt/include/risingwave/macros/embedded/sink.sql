@@ -34,6 +34,23 @@
   {% endif %}
 {% endmacro %}
 
+{# Look up a connection model's node config by model name from the dbt graph. #}
+{% macro risingwave__get_connection_node(connection_ref) %}
+  {%- set ns = namespace(conn_node=none) -%}
+  {% for node_id, node in graph.nodes.items() %}
+    {% if node.name == connection_ref and node.config.get('materialized') == 'connection' %}
+      {%- set ns.conn_node = node -%}
+    {% endif %}
+  {% endfor %}
+  {% if ns.conn_node is none %}
+    {{ exceptions.raise_compiler_error(
+      "connection_ref '" ~ connection_ref ~ "' not found in the dbt graph. "
+      ~ "Ensure a model with materialized='connection' and name='" ~ connection_ref ~ "' exists."
+    ) }}
+  {% endif %}
+  {{ return(ns.conn_node) }}
+{% endmacro %}
+
 {# Resolve with_properties by applying auto_* flags. Returns a new dict. #}
 {% macro risingwave__resolve_with_properties(relation, sink_config) %}
   {%- set with_properties = sink_config.get('with_properties', {}).copy() -%}
@@ -57,12 +74,40 @@
 
 {% macro risingwave__create_embedded_sink(relation, sink_config, with_properties) %}
   {%- set sink_name = risingwave__get_embedded_sink_name(relation) -%}
-  {# Resolve connection_ref to a dbt relation for the SQL connection clause #}
   {%- set connection_ref = sink_config.get('connection_ref', none) -%}
-  {%- set connection_relation = none -%}
-  {% if connection_ref %}
-    {%- set connection_relation = ref(connection_ref) -%}
+  {%- set connection = sink_config.get('connection', none) -%}
+
+  {# Validate: connection_ref and connection are mutually exclusive #}
+  {% if connection_ref and connection %}
+    {{ exceptions.raise_compiler_error(
+      "Embedded sink '" ~ sink_name ~ "': 'connection_ref' and 'connection' cannot both be set. "
+      ~ "Use 'connection_ref' for dbt-managed connections or 'connection' for plain RisingWave connection names."
+    ) }}
   {% endif %}
+
+  {# Validate: connector/connection must not appear in with_properties #}
+  {% if connection_ref and (with_properties.get('connector') or with_properties.get('connection')) %}
+    {{ exceptions.raise_compiler_error(
+      "Embedded sink '" ~ sink_name ~ "': do not set 'connector' or 'connection' in with_properties "
+      ~ "when using 'connection_ref'. The connector type comes from the connection model."
+    ) }}
+  {% endif %}
+
+  {# Resolve the connection clause for SQL #}
+  {%- set connection_sql = none -%}
+  {%- set connector_type = none -%}
+  {% if connection_ref %}
+    {# ref() registers the DAG dependency; output schema-qualified name for RisingWave #}
+    {%- set connection_relation = ref(connection_ref) -%}
+    {%- set connection_sql = '"' ~ connection_relation.schema ~ '"."' ~ connection_relation.identifier ~ '"' -%}
+    {# Auto-derive connector type from the connection model's config #}
+    {%- set conn_node = risingwave__get_connection_node(connection_ref) -%}
+    {%- set connector_type = conn_node.config.get('connector', none) -%}
+  {% elif connection %}
+    {# Plain RisingWave connection name — injected without quotes #}
+    {%- set connection_sql = connection -%}
+  {% endif %}
+
   {%- set data_format = sink_config.get('format', none) -%}
   {%- set data_encode = sink_config.get('encode', none) -%}
   {%- set format_properties = sink_config.get('format_properties', {}) -%}
@@ -80,8 +125,11 @@
       {% call statement('create_embedded_sink') -%}
         create sink "{{ relation.schema }}"."{{ sink_name }}" from {{ relation }}
         with (
-          {% if connection_relation %}
-          connection = {{ connection_relation }},
+          {% if connection_sql %}
+          connection = {{ connection_sql }},
+          {% endif %}
+          {% if connector_type %}
+          connector = '{{ connector_type }}',
           {% endif %}
           {% for key, value in with_properties.items() %}
           {{ key }} = {{ risingwave__render_with_value(value) }}
