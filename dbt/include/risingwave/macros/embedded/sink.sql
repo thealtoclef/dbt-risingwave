@@ -157,5 +157,37 @@
   {% if embedded_sink is not none and embedded_sink.get('enabled', false) %}
     {%- set resolved_props = risingwave__resolve_with_properties(relation, embedded_sink) -%}
     {{ risingwave__create_embedded_sink(relation, embedded_sink, resolved_props) }}
+    {{ risingwave__iceberg_persist_docs(relation, model, embedded_sink, resolved_props) }}
   {% endif %}
 {% endmacro %}
+
+{% macro risingwave__iceberg_persist_docs(relation, model, embedded_sink, resolved_props) -%}
+  {# Sync docs to the Iceberg table that an embedded sink writes to. #}
+  {# Only supported with connection_ref (not plain connection) since we need #}
+  {# the connection model's connector_properties for PyIceberg catalog config. #}
+  {% if embedded_sink.get('iceberg_persist_docs', false) %}
+    {%- set connection_ref = embedded_sink.get('connection_ref') -%}
+    {% if not connection_ref %}
+      {{ exceptions.raise_compiler_error(
+        "iceberg_persist_docs requires 'connection_ref' (not 'connection'). "
+        ~ "Set connection_ref to a connection materialization model with connector='iceberg'."
+      ) }}
+    {% endif %}
+    {%- set conn_node = risingwave__get_connection_node(connection_ref) -%}
+    {%- set connector = (conn_node.config.get('connector', '') or '') | lower -%}
+    {% if connector == 'iceberg' %}
+      {# Check persist_docs config - skip Iceberg connection if nothing to sync #}
+      {%- set persist_docs_config = model.get('config', {}).get('persist_docs', {}) -%}
+      {%- set for_relation = persist_docs_config.get('relation', false) -%}
+      {%- set for_columns = persist_docs_config.get('columns', false) -%}
+      {% if for_relation or for_columns %}
+        {%- set connector_properties = conn_node.config.get('connector_parameters', {}) -%}
+        {% do adapter.iceberg_persist_docs(relation, model, connector_properties, resolved_props) %}
+      {% else %}
+        {{ log("iceberg_persist_docs is enabled but persist_docs.relation and persist_docs.columns are both false. Skipping Iceberg doc sync.") }}
+      {% endif %}
+    {% else %}
+      {{ log("iceberg_persist_docs is enabled but connection '" ~ connection_ref ~ "' connector is '" ~ connector ~ "', not 'iceberg'. Skipping.") }}
+    {% endif %}
+  {% endif %}
+{%- endmacro %}

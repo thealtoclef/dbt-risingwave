@@ -102,6 +102,50 @@ CREATE INDEX IF NOT EXISTS "__dbt_index_mv_user_id"
 
 Note: RisingWave does not support `unique` or `type` (index method) options from the Postgres adapter. These options are silently ignored.
 
+### Iceberg Documentation Sync (Embedded Sink)
+
+When an embedded sink targets an Iceberg connector, the adapter can sync model and column descriptions to the corresponding Iceberg table via [PyIceberg](https://py.iceberg.apache.org/).
+
+Install the optional dependency for your storage backend:
+
+```shell
+pip install 'dbt-risingwave[iceberg-gcp]'   # Google Cloud / BigLake
+pip install 'dbt-risingwave[iceberg-aws]'   # AWS / Glue / S3
+pip install 'dbt-risingwave[iceberg-azure]' # Azure / ADLS
+pip install 'dbt-risingwave[iceberg]'       # generic (REST, Hive, SQL catalogs)
+```
+
+**Important**: Iceberg doc sync requires `iceberg_persist_docs: true` **and at least one of** `persist_docs.relation: true` **or** `persist_docs.columns: true`. The `iceberg_persist_docs` flag enables the Iceberg sync, while `persist_docs` controls which descriptions are synced:
+- `persist_docs.relation: true` — syncs the model description to the Iceberg table comment
+- `persist_docs.columns: true` — syncs column descriptions to Iceberg field-level docs
+- Set either one or both — only the enabled sync types will be applied
+
+Enable per model by setting `iceberg_persist_docs: true` in the `embedded_sink` config with a `connection_ref` pointing to a `connection` model. The catalog connection properties are automatically derived from the connection model's `connector_properties` — no separate catalog config needed:
+
+```yaml
+models:
+  - name: my_iceberg_model
+    description: "Sales fact table"
+    config:
+      persist_docs:
+        relation: true
+        columns: true
+      embedded_sink:
+        enabled: true
+        iceberg_persist_docs: true
+        connection_ref: conn_iceberg
+        with_properties:
+          database.name: prod_iceberg
+          table.name: sales_facts
+    columns:
+      - name: order_id
+        description: "Unique order identifier"
+```
+
+Sync behaves the same as standard dbt `persist_docs` — if any operation fails, the model run fails with an error.
+
+See [docs/configuration.md](docs/configuration.md) for the full reference.
+
 ## Materializations
 
 The adapter follows standard dbt model workflows, with RisingWave-specific materializations and behaviors.
