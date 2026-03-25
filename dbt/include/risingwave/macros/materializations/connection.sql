@@ -33,7 +33,7 @@
 
   {% if not existing_connection or (full_refresh_mode and existing_connection) %}
     {% call statement('main') -%}
-      {{ risingwave__run_sql(sql) }}
+      {{ risingwave__create_connection(target_relation) }}
     {%- endcall %}
   {% else %}
     {{ risingwave__execute_no_op(target_relation) }}

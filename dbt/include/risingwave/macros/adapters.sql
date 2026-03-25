@@ -247,6 +247,21 @@
     ;
 {%- endmacro %}
 
+{% macro risingwave__create_connection(relation) -%}
+    {%- set _connector_parameters = config.require("connector_parameters") -%}
+    {%- set connector = config.require("connector") -%}
+
+    create connection if not exists {{ relation }}
+    with (
+          type = '{{ connector }}',
+          {%- for key, value in _connector_parameters.items() %}
+          {{ key }} = '{{ value }}'
+          {%- if not loop.last -%},{%- endif -%}
+          {% endfor %}
+      )
+    ;
+{%- endmacro %}
+
 {% macro risingwave__get_primary_keys(relation) %}
   {% if execute %}
     {% set q %}
