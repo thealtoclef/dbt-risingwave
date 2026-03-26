@@ -11,6 +11,84 @@ from dbt.adapters.risingwave.relation import RisingWaveRelation
 
 logger = AdapterLogger("RisingWave")
 
+
+def _deep_merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """Deep merge two dicts: override takes precedence, nested dicts are merged recursively."""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(value, dict) and isinstance(result[key], dict):
+            result[key] = _deep_merge_dicts(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+# RisingWave-specific config keys that should be deep-merged rather than clobbered
+# when users define them in the models: block of dbt_project.yml.
+_RISINGWAVE_DEEP_MERGE_KEYS = frozenset(["embedded_sink", "embedded_sub"])
+
+
+def _install_risingwave_config_deep_merge() -> None:
+    """Patch dbt-core's config merge to deep-merge RisingWave-specific config keys.
+
+    dbt-core's default behavior for unknown config keys (like embedded_sink, embedded_sub)
+    is a shallow clobber: a model-level config() call replaces the entire project-level
+    value, so nested dicts like with_properties are lost rather than merged.
+
+    This patch intercepts BaseConfig.update_from to apply _deep_merge_dicts for
+    embedded_sink and embedded_sub, enabling users to define shared defaults in the
+    models: block of dbt_project.yml and override only specific keys per model:
+
+        # dbt_project.yml
+        models:
+          my_project:
+            +embedded_sink:
+              enabled: true
+              with_properties:
+                connector: iceberg
+                warehouse.path: s3://my-bucket/
+
+        # model config (merges with_properties rather than replacing)
+        {{ config(embedded_sink={'with_properties': {'table.name': 'my_table'}}) }}
+    """
+    try:
+        from dbt_common.contracts.config import base as _config_base
+    except ImportError:
+        return
+
+    _orig_update_from = _config_base.BaseConfig.update_from
+
+    def _patched_update_from(self, data: dict, config_cls, validate: bool = True):
+        # Stash RW keys before the original processes them (which would shallow-clobber them).
+        rw_stash = {}
+        for key in list(data):
+            if key in _RISINGWAVE_DEEP_MERGE_KEYS:
+                rw_stash[key] = data.pop(key)
+
+        # Let dbt handle all other keys normally.
+        result = _orig_update_from(self, data, config_cls, validate=validate)
+
+        # Restore stashed keys so we don't permanently mutate the caller's dict.
+        data.update(rw_stash)
+
+        if not rw_stash:
+            return result
+
+        # Deep-merge the RW keys on top of what the original produced.
+        result_dct = result.to_dict(omit_none=False)
+        for key, new_val in rw_stash.items():
+            existing = result_dct.get(key)
+            if isinstance(existing, dict) and isinstance(new_val, dict):
+                result_dct[key] = _deep_merge_dicts(existing, new_val)
+            else:
+                result_dct[key] = new_val
+        return result.from_dict(result_dct)
+
+    _config_base.BaseConfig.update_from = _patched_update_from
+
+
+_install_risingwave_config_deep_merge()
+
 # 1:1 mapping from RisingWave iceberg connection connector_properties to PyIceberg
 # catalog properties.  Properties not in this map are handled by special-case
 # logic in _rw_props_to_pyiceberg() or silently skipped (RisingWave-only props
