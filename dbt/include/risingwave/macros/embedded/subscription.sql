@@ -56,8 +56,8 @@
 {% endmacro %}
 
 {% macro risingwave__manage_subscription(relation, full_refresh_mode) %}
-  {%- set embedded_sub = config.get('embedded_sub', none) -%}
-  {% if embedded_sub is not none and embedded_sub.get('enabled', false) %}
+  {%- set embedded_sub = config.get('embedded_sub', {}) -%}
+  {% if embedded_sub and embedded_sub.get('enabled', false) %}
     {{ risingwave__create_subscription(relation, embedded_sub) }}
   {% endif %}
 {% endmacro %}

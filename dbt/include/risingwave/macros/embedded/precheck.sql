@@ -1,8 +1,8 @@
 {% macro risingwave__embedded_precheck(relation) %}
-  {%- set embedded_sub = config.get('embedded_sub', none) -%}
-  {%- set sub_enabled = embedded_sub is not none and embedded_sub.get('enabled', false) -%}
-  {%- set embedded_sink = config.get('embedded_sink', none) -%}
-  {%- set sink_enabled = embedded_sink is not none and embedded_sink.get('enabled', false) -%}
+  {%- set embedded_sub = config.get('embedded_sub', {}) -%}
+  {%- set sub_enabled = embedded_sub and embedded_sub.get('enabled', false) -%}
+  {%- set embedded_sink = config.get('embedded_sink', {}) -%}
+  {%- set sink_enabled = embedded_sink and embedded_sink.get('enabled', false) -%}
 
   {% if execute %}
     {%- set collisions = [] -%}
