@@ -43,6 +43,7 @@
     {% else %}
       {{- log("Creating embedded subscription: " ~ relation.schema ~ "." ~ sub_name) -}}
       {% call statement('create_subscription') -%}
+        {{ risingwave__render_sql_header() }}
         create subscription "{{ relation.schema }}"."{{ sub_name }}" from {{ relation }} with (
           {% for key, value in with_properties.items() %}
           {{ key }} = {{ risingwave__render_with_value(value) }}
