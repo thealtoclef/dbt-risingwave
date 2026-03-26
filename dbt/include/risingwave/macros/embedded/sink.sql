@@ -154,8 +154,8 @@
 {% endmacro %}
 
 {% macro risingwave__manage_embedded_sink(relation, full_refresh_mode) %}
-  {%- set embedded_sink = config.get('embedded_sink', none) -%}
-  {% if embedded_sink is not none and embedded_sink.get('enabled', false) %}
+  {%- set embedded_sink = config.get('embedded_sink', {}) -%}
+  {% if embedded_sink and embedded_sink.get('enabled', false) %}
     {%- set resolved_props = risingwave__resolve_with_properties(relation, embedded_sink) -%}
     {{ risingwave__create_embedded_sink(relation, embedded_sink, resolved_props) }}
     {{ risingwave__iceberg_persist_docs(relation, model, embedded_sink, resolved_props) }}
