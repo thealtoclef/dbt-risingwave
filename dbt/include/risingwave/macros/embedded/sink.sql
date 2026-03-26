@@ -123,6 +123,7 @@
     {% else %}
       {{- log("Creating embedded sink: " ~ relation.schema ~ "." ~ sink_name) -}}
       {% call statement('create_embedded_sink') -%}
+        {{ risingwave__render_sql_header() }}
         create sink "{{ relation.schema }}"."{{ sink_name }}" from {{ relation }}
         with (
           {% if connection_sql %}
