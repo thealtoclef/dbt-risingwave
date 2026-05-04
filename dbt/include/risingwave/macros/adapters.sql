@@ -24,6 +24,31 @@
     {%- do header_parts.append("set streaming_parallelism_for_backfill = " ~ streaming_parallelism_for_backfill ~ ";") -%}
   {%- endif -%}
 
+  {%- set streaming_parallelism_for_sink = config.get("streaming_parallelism_for_sink", none) -%}
+  {%- if streaming_parallelism_for_sink is not none -%}
+    {%- do header_parts.append("set streaming_parallelism_for_sink = " ~ streaming_parallelism_for_sink ~ ";") -%}
+  {%- endif -%}
+
+  {%- set streaming_parallelism_for_table = config.get("streaming_parallelism_for_table", none) -%}
+  {%- if streaming_parallelism_for_table is not none -%}
+    {%- do header_parts.append("set streaming_parallelism_for_table = " ~ streaming_parallelism_for_table ~ ";") -%}
+  {%- endif -%}
+
+  {%- set streaming_parallelism_for_materialized_view = config.get("streaming_parallelism_for_materialized_view", none) -%}
+  {%- if streaming_parallelism_for_materialized_view is not none -%}
+    {%- do header_parts.append("set streaming_parallelism_for_materialized_view = " ~ streaming_parallelism_for_materialized_view ~ ";") -%}
+  {%- endif -%}
+
+  {%- set streaming_parallelism_for_index = config.get("streaming_parallelism_for_index", none) -%}
+  {%- if streaming_parallelism_for_index is not none -%}
+    {%- do header_parts.append("set streaming_parallelism_for_index = " ~ streaming_parallelism_for_index ~ ";") -%}
+  {%- endif -%}
+
+  {%- set streaming_parallelism_for_source = config.get("streaming_parallelism_for_source", none) -%}
+  {%- if streaming_parallelism_for_source is not none -%}
+    {%- do header_parts.append("set streaming_parallelism_for_source = " ~ streaming_parallelism_for_source ~ ";") -%}
+  {%- endif -%}
+
   {%- set streaming_max_parallelism = config.get("streaming_max_parallelism", none) -%}
   {%- if streaming_max_parallelism is not none -%}
     {%- do header_parts.append("set streaming_max_parallelism = " ~ streaming_max_parallelism ~ ";") -%}

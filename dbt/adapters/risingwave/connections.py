@@ -22,6 +22,11 @@ class RisingWaveCredentials(PostgresCredentials):
     # todo(siwei): append more config here
     streaming_parallelism: Optional[int] = None
     streaming_parallelism_for_backfill: Optional[int] = None
+    streaming_parallelism_for_sink: Optional[int] = None
+    streaming_parallelism_for_table: Optional[int] = None
+    streaming_parallelism_for_materialized_view: Optional[int] = None
+    streaming_parallelism_for_index: Optional[int] = None
+    streaming_parallelism_for_source: Optional[int] = None
     streaming_max_parallelism: Optional[int] = None
     enable_serverless_backfill: Optional[bool] = None
 
@@ -153,6 +158,26 @@ class RisingWaveConnectionManager(PostgresConnectionManager):
                 (
                     "streaming_parallelism_for_backfill",
                     credentials.streaming_parallelism_for_backfill,
+                ),
+                (
+                    "streaming_parallelism_for_sink",
+                    credentials.streaming_parallelism_for_sink,
+                ),
+                (
+                    "streaming_parallelism_for_table",
+                    credentials.streaming_parallelism_for_table,
+                ),
+                (
+                    "streaming_parallelism_for_materialized_view",
+                    credentials.streaming_parallelism_for_materialized_view,
+                ),
+                (
+                    "streaming_parallelism_for_index",
+                    credentials.streaming_parallelism_for_index,
+                ),
+                (
+                    "streaming_parallelism_for_source",
+                    credentials.streaming_parallelism_for_source,
                 ),
                 ("streaming_max_parallelism", credentials.streaming_max_parallelism),
                 ("enable_serverless_backfill", credentials.enable_serverless_backfill),
