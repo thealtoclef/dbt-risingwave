@@ -35,6 +35,11 @@ default:
       schema: public
       streaming_parallelism: 2
       streaming_parallelism_for_backfill: 2
+      streaming_parallelism_for_sink: 4
+      streaming_parallelism_for_table: 1
+      streaming_parallelism_for_materialized_view: 1
+      streaming_parallelism_for_index: 1
+      streaming_parallelism_for_source: 1
       streaming_max_parallelism: 8
       enable_serverless_backfill: true
   target: dev
@@ -46,6 +51,11 @@ Supported adapter-specific profile keys:
 | --- | --- |
 | `streaming_parallelism` | Sets `SET streaming_parallelism = ...` for the session. |
 | `streaming_parallelism_for_backfill` | Sets `SET streaming_parallelism_for_backfill = ...` for the session. |
+| `streaming_parallelism_for_sink` | Sets `SET streaming_parallelism_for_sink = ...` for the session. |
+| `streaming_parallelism_for_table` | Sets `SET streaming_parallelism_for_table = ...` for the session. |
+| `streaming_parallelism_for_materialized_view` | Sets `SET streaming_parallelism_for_materialized_view = ...` for the session. |
+| `streaming_parallelism_for_index` | Sets `SET streaming_parallelism_for_index = ...` for the session. |
+| `streaming_parallelism_for_source` | Sets `SET streaming_parallelism_for_source = ...` for the session. |
 | `streaming_max_parallelism` | Sets `SET streaming_max_parallelism = ...` for the session. |
 | `enable_serverless_backfill` | Sets `SET enable_serverless_backfill = true/false` for the session. |
 
@@ -103,6 +113,11 @@ You can override the session-level streaming settings for an individual model:
     materialized='materialized_view',
     streaming_parallelism=2,
     streaming_parallelism_for_backfill=2,
+    streaming_parallelism_for_sink=4,
+    streaming_parallelism_for_table=1,
+    streaming_parallelism_for_materialized_view=1,
+    streaming_parallelism_for_index=1,
+    streaming_parallelism_for_source=1,
     streaming_max_parallelism=8
 ) }}
 
